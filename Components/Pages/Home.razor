@@ -1,0 +1,69 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject BggApiService Api
+
+<PageTitle>Home</PageTitle>
+
+<h1>Board Game Night Planner (POC)</h1>
+
+<div>
+    <input placeholder="BGG Username"
+           @bind="username"
+           @bind:event="oninput" />
+
+    <button @onclick="LoadCollection" disabled="@isLoading">
+        @(isLoading ? "Loading..." : "Load Collection")
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <p style="color:red">@error</p>
+}
+
+@if (collection.Any())
+{
+    <h3>@username's Collection</h3>
+
+    <ul>
+        @foreach (var game in collection)
+        {
+            <li>
+                @game.Name (@game.YearPublished)
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private string username = "";
+    private bool isLoading;
+    private string error = "";
+
+    private List<CollectionItem> collection = new();
+
+    private async Task LoadCollection()
+    {
+        error = "";
+        collection.Clear();
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            error = "Please enter a username.";
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            collection = await Api.GetUserCollectionAsync(username);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+
+        isLoading = false;
+    }
+}
