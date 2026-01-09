@@ -8,10 +8,6 @@ main {
     flex: 1;
 }
 
-.sidebar {
-    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
-}
-
 .top-row {
     background-color: #f7f7f7;
     border-bottom: 1px solid #d6d5d5;
@@ -74,6 +70,21 @@ main {
         padding-left: 2rem !important;
         padding-right: 1.5rem !important;
     }
+}
+
+.bgg-footer {
+    margin-top: 40px;
+    padding: 16px;
+    text-align: center;
+    opacity: 0.85;
+}
+
+.bgg-footer img {
+    transition: opacity 0.2s ease;
+}
+
+.bgg-footer img:hover {
+    opacity: 1;
 }
 
 #blazor-error-ui {
