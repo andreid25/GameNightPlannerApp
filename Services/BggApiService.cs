@@ -3,19 +3,23 @@ using System.Xml.Linq;
 public class BggApiService
 {
     private readonly HttpClient _http;
+    private readonly string _apiKey;
 
-    public BggApiService(HttpClient http)
+    public BggApiService(HttpClient http, IConfiguration config)
     {
         _http = http;
+        _apiKey = config["Bgg:ApiKey"]
+            ?? throw new Exception("BGG API key not configured");
     }
 
     public async Task<Game> GetGameAsync(int id)
     {
-        var url = $"https://boardgamegeek.com/xmlapi2/thing?id={id}&stats=1";
-        var xml = await _http.GetStringAsync(url);
+        string url = $"https://boardgamegeek.com/xmlapi2/thing?id={id}&stats=1";
+        _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+        string xml = await _http.GetStringAsync(url);
 
-        var doc = XDocument.Parse(xml);
-        var item = doc.Descendants("item").First();
+        XDocument doc = XDocument.Parse(xml);
+        XElement item = doc.Descendants("item").First();
 
         return new Game
         {
@@ -38,7 +42,8 @@ public class BggApiService
     public async Task<List<CollectionItem>> GetUserCollectionAsync(string username)
     {
         string url = $"https://boardgamegeek.com/xmlapi2/collection?username={username}&own=1";
-
+        _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+        
         for (int attempt = 0; attempt < 5; attempt++)
         {
             string? xml = await _http.GetStringAsync(url);
