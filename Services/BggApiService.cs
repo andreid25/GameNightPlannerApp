@@ -41,7 +41,7 @@ public class BggApiService
 
     public async Task<List<CollectionItem>> GetUserCollectionAsync(string username)
     {
-        string url = $"https://boardgamegeek.com/xmlapi2/collection?username={username}&own=1";
+        string url = $"https://boardgamegeek.com/xmlapi2/collection?username={username}&own=1&excludesubtype=boardgameexpansion";
         _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
         
         for (int attempt = 0; attempt < 5; attempt++)
