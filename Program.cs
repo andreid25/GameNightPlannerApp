@@ -9,18 +9,16 @@ var builder = WebApplication.CreateBuilder(args);
 static ResiliencePipeline<HttpResponseMessage> CreateBggPipeline()
 {
     return new ResiliencePipelineBuilder<HttpResponseMessage>()
-        .AddRateLimiter(new RateLimiterStrategyOptions
-        {
-            RateLimiter = new TokenBucketRateLimiter(new TokenBucketRateLimiterOptions
+        .AddRateLimiter(new TokenBucketRateLimiter(
+            new TokenBucketRateLimiterOptions
             {
+                ReplenishmentPeriod = TimeSpan.FromSeconds(5),
+                AutoReplenishment = true,
                 TokenLimit = 1,
                 TokensPerPeriod = 1,
-                ReplenishmentPeriod = TimeSpan.FromSeconds(1),
-                AutoReplenishment = true,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0 // reject immediately if exceeded
-            })
-        })
+                QueueLimit = 0
+            }))
         .AddRetry(new RetryStrategyOptions<HttpResponseMessage>
         {
             MaxRetryAttempts = 3,
