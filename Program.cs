@@ -12,7 +12,7 @@ static ResiliencePipeline<HttpResponseMessage> CreateBggPipeline()
         .AddRateLimiter(new TokenBucketRateLimiter(
             new TokenBucketRateLimiterOptions
             {
-                ReplenishmentPeriod = TimeSpan.FromSeconds(5),
+                ReplenishmentPeriod = TimeSpan.FromSeconds(1),
                 AutoReplenishment = true,
                 TokenLimit = 1,
                 TokensPerPeriod = 1,

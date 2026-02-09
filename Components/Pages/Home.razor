@@ -26,10 +26,12 @@
     <h3>@username's Collection</h3>
 
     <ul>
-        @foreach (var game in collection)
+        @foreach (Game game in collection)
         {
             <li>
-                @game.Name (@game.YearPublished)
+                <strong>@game.Name</strong>
+                — Players: @game.MinPlayers–@game.MaxPlayers
+                — Time: @game.PlayingTime min
             </li>
         }
     </ul>
@@ -40,7 +42,7 @@
     private bool isLoading;
     private string error = "";
 
-    private List<CollectionItem> collection = new();
+    private List<Game> collection = new();
 
     private async Task LoadCollection()
     {
@@ -57,7 +59,7 @@
 
         try
         {
-            collection = await Api.GetUserCollectionAsync(username);
+            collection = await Api.GetUserCollectionWithDetailsAsync(username);
         }
         catch (Exception ex)
         {

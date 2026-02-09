@@ -1,4 +1,6 @@
+using System.Threading;
 using System.Xml.Linq;
+using Polly.RateLimiting;
 
 public class BggApiService
 {
@@ -12,45 +14,77 @@ public class BggApiService
             ?? throw new Exception("BGG API key not configured");
     }
 
-    public async Task<Game> GetGameAsync(int id)
+    public async Task<Game>? GetGameAsync(int id)
     {
         string url = $"https://boardgamegeek.com/xmlapi2/thing?id={id}&stats=1";
         _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
-        string xml = await _http.GetStringAsync(url);
-
+        string? xml = null;
+        for (int i = 0; i < 3; i++)
+        {
+            try
+            {
+                xml = await _http.GetStringAsync(url);
+                break;
+            }
+            catch (RateLimiterRejectedException e)
+            {
+                TimeSpan delay = e.RetryAfter ?? TimeSpan.FromSeconds(2);
+                await Task.Delay(delay);
+            }
+        }
+        if (xml is null)
+        {
+            return null;
+        }
         XDocument doc = XDocument.Parse(xml);
         XElement item = doc.Descendants("item").First();
 
         return new Game
         {
-            Id = id,
-            Name = item.Elements("name")
-                       .First(n => n.Attribute("type")?.Value == "primary")
-                       .Attribute("value")!.Value,
-            YearPublished = int.Parse(item.Element("yearpublished")?.Attribute("value")?.Value ?? "0"),
-            AverageRating = double.Parse(item.Descendants("average").First().Attribute("value")!.Value),
-            UsersRated = int.Parse(item.Descendants("usersrated").First().Attribute("value")!.Value)
+            Name = item.Descendants("name").FirstOrDefault(e => (string)e.Attribute("type") == "primary").Attribute("value")?.Value ?? "Unknown",
+            MinPlayers = int.Parse(
+                item.Element("minplayers")?.Attribute("value")?.Value ?? "0"),
+            MaxPlayers = int.Parse(
+                item.Element("maxplayers")?.Attribute("value")?.Value ?? "0"),
+            PlayingTime = int.Parse(
+                item.Element("playingtime")?.Attribute("value")?.Value ?? "0"),
+            MinPlayTime = int.Parse(
+                item.Element("minplaytime")?.Attribute("value")?.Value ?? "0"),
+            MaxPlayTime = int.Parse(
+                item.Element("maxplaytime")?.Attribute("value")?.Value ?? "0")
         };
     }
 
-    public async Task<List<Game>> GetGamesAsync(IEnumerable<int> ids)
+    public async Task<List<Game>> GetUserCollectionWithDetailsAsync(string username)
     {
-        var tasks = ids.Select(GetGameAsync);
-        return (await Task.WhenAll(tasks)).ToList();
+        List<CollectionItem> collection = await GetUserCollectionAsync(username);
+        List<Game> detailedCollection = new();
+        foreach (CollectionItem collectionItem in collection)
+        {
+            Game? details = await GetGameAsync(collectionItem.GameId);
+            if (details is not null)
+            {
+                detailedCollection.Add(details);
+            }
+        }
+
+        return detailedCollection;
     }
 
     public async Task<List<CollectionItem>> GetUserCollectionAsync(string username)
     {
-        string url = $"https://boardgamegeek.com/xmlapi2/collection?username={username}&own=1&excludesubtype=boardgameexpansion";
+        string url = $"https://boardgamegeek.com/xmlapi2/collection?username={username}&own=1&subtype=boardgame&excludesubtype=boardgameexpansion";
         _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
         
         for (int attempt = 0; attempt < 5; attempt++)
         {
             string? xml = await _http.GetStringAsync(url);
             XDocument? doc = XDocument.Parse(xml);
+            Console.WriteLine(doc);
+            Console.WriteLine(doc.Root?.Name);
+            Console.WriteLine("Hello");
 
-            // TODO: Realistically we should check for the exact message
-            if (doc.Root?.Name == "message")
+            if (doc.Root?.Name == "message" && doc.Descendants("message").FirstOrDefault()?.Value == "Your request for this collection has been accepted and will be processed.  Please try again later for access.")
             {
                 await Task.Delay(2000);
                 continue;
