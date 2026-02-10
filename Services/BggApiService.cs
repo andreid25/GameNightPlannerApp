@@ -1,4 +1,3 @@
-using System.Threading;
 using System.Xml.Linq;
 using Polly.RateLimiting;
 
@@ -14,9 +13,9 @@ public class BggApiService
             ?? throw new Exception("BGG API key not configured");
     }
 
-    public async Task<Game>? GetGameAsync(int id)
+    public async Task<List<Game>>? GetGameAsync(string ids)
     {
-        string url = $"https://boardgamegeek.com/xmlapi2/thing?id={id}&stats=1";
+        string url = $"https://boardgamegeek.com/xmlapi2/thing?id={ids}&stats=1";
         _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
         string? xml = null;
         for (int i = 0; i < 3; i++)
@@ -37,34 +36,32 @@ public class BggApiService
             return null;
         }
         XDocument doc = XDocument.Parse(xml);
-        XElement item = doc.Descendants("item").First();
-
-        return new Game
+        List<Game> games = new();
+        foreach (XElement item in doc.Descendants("item"))
         {
-            Name = item.Descendants("name").FirstOrDefault(e => (string)e.Attribute("type") == "primary").Attribute("value")?.Value ?? "Unknown",
-            MinPlayers = int.Parse(
-                item.Element("minplayers")?.Attribute("value")?.Value ?? "0"),
-            MaxPlayers = int.Parse(
-                item.Element("maxplayers")?.Attribute("value")?.Value ?? "0"),
-            PlayingTime = int.Parse(
-                item.Element("playingtime")?.Attribute("value")?.Value ?? "0"),
-            MinPlayTime = int.Parse(
-                item.Element("minplaytime")?.Attribute("value")?.Value ?? "0"),
-            MaxPlayTime = int.Parse(
-                item.Element("maxplaytime")?.Attribute("value")?.Value ?? "0")
-        };
+            games.Add(new Game {
+                Name = item.Descendants("name").FirstOrDefault(e => (string)e.Attribute("type") == "primary").Attribute("value")?.Value ?? "Unknown",
+                MinPlayers = int.Parse(item.Element("minplayers")?.Attribute("value")?.Value ?? "0"),
+                MaxPlayers = int.Parse(item.Element("maxplayers")?.Attribute("value")?.Value ?? "0"),
+                PlayingTime = int.Parse(item.Element("playingtime")?.Attribute("value")?.Value ?? "0"),
+                MinPlayTime = int.Parse(item.Element("minplaytime")?.Attribute("value")?.Value ?? "0"),
+                MaxPlayTime = int.Parse(item.Element("maxplaytime")?.Attribute("value")?.Value ?? "0")
+            });
+        }
+        return games;
     }
 
     public async Task<List<Game>> GetUserCollectionWithDetailsAsync(string username)
     {
         List<CollectionItem> collection = await GetUserCollectionAsync(username);
         List<Game> detailedCollection = new();
-        foreach (CollectionItem collectionItem in collection)
+        foreach (CollectionItem[] collectionItems in collection.Chunk(20))
         {
-            Game? details = await GetGameAsync(collectionItem.GameId);
+            string idParam = string.Join(",", collectionItems.Select(p => p.GameId));
+            List<Game> details = await GetGameAsync(idParam);
             if (details is not null)
             {
-                detailedCollection.Add(details);
+                detailedCollection.AddRange(details);
             }
         }
 
@@ -80,9 +77,6 @@ public class BggApiService
         {
             string? xml = await _http.GetStringAsync(url);
             XDocument? doc = XDocument.Parse(xml);
-            Console.WriteLine(doc);
-            Console.WriteLine(doc.Root?.Name);
-            Console.WriteLine("Hello");
 
             if (doc.Root?.Name == "message" && doc.Descendants("message").FirstOrDefault()?.Value == "Your request for this collection has been accepted and will be processed.  Please try again later for access.")
             {

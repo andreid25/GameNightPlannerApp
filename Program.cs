@@ -4,7 +4,7 @@ using Polly.Retry;
 using Polly.RateLimiting;
 using System.Threading.RateLimiting;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 static ResiliencePipeline<HttpResponseMessage> CreateBggPipeline()
 {
@@ -12,7 +12,7 @@ static ResiliencePipeline<HttpResponseMessage> CreateBggPipeline()
         .AddRateLimiter(new TokenBucketRateLimiter(
             new TokenBucketRateLimiterOptions
             {
-                ReplenishmentPeriod = TimeSpan.FromSeconds(1),
+                ReplenishmentPeriod = TimeSpan.FromSeconds(.1),
                 AutoReplenishment = true,
                 TokenLimit = 1,
                 TokensPerPeriod = 1,
@@ -24,7 +24,7 @@ static ResiliencePipeline<HttpResponseMessage> CreateBggPipeline()
             MaxRetryAttempts = 3,
             DelayGenerator = args =>
             {
-                var delay = TimeSpan.FromSeconds(Math.Pow(2, args.AttemptNumber));
+                TimeSpan delay = TimeSpan.FromSeconds(5 * args.AttemptNumber);
                 return ValueTask.FromResult<TimeSpan?>(delay);
             },
             ShouldHandle = args =>
@@ -57,7 +57,7 @@ builder.Services.AddHttpClient<BggApiService>(client =>
 {
     builder.AddPipeline(CreateBggPipeline());
 });
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
