@@ -10,4 +10,6 @@ public class Game
     public int PlayingTime { get; set; }
     public int MinPlayTime { get; set; }
     public int MaxPlayTime { get; set; }
+
+    public HashSet<string> Owners { get; set; } = new();
 }

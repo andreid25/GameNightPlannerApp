@@ -5,6 +5,7 @@ public class BggApiService
 {
     private readonly HttpClient _http;
     private readonly string _apiKey;
+    public Dictionary<int, Game> games = new();
 
     public BggApiService(HttpClient http, IConfiguration config)
     {
@@ -40,7 +41,9 @@ public class BggApiService
         foreach (XElement item in doc.Descendants("item"))
         {
             games.Add(new Game {
-                Name = item.Descendants("name").FirstOrDefault(e => (string)e.Attribute("type") == "primary").Attribute("value")?.Value ?? "Unknown",
+                GameId = int.Parse(item.Attribute("id")?.Value ?? "0"),
+                Name = item.Descendants("name").FirstOrDefault(e => (string)e.Attribute("type") == "primary")?.Attribute("value")?.Value ?? "Unknown",
+                ImageLink = item.Element("image")?.Value ?? "Unknown",
                 MinPlayers = int.Parse(item.Element("minplayers")?.Attribute("value")?.Value ?? "0"),
                 MaxPlayers = int.Parse(item.Element("maxplayers")?.Attribute("value")?.Value ?? "0"),
                 PlayingTime = int.Parse(item.Element("playingtime")?.Attribute("value")?.Value ?? "0"),
@@ -51,13 +54,12 @@ public class BggApiService
         return games;
     }
 
-    public async Task<List<Game>> GetUserCollectionWithDetailsAsync(string username)
+    public async Task<List<Game>> GetGameDetails(List<int> ids, CancellationToken ct)
     {
-        List<CollectionItem> collection = await GetUserCollectionAsync(username);
         List<Game> detailedCollection = new();
-        foreach (CollectionItem[] collectionItems in collection.Chunk(20))
+        foreach (int[] idGroup in ids.Chunk(20))
         {
-            string idParam = string.Join(",", collectionItems.Select(p => p.GameId));
+            string idParam = string.Join(",", idGroup);
             List<Game> details = await GetGameAsync(idParam);
             if (details is not null)
             {
@@ -96,5 +98,39 @@ public class BggApiService
         }
 
         throw new Exception("BGG collection request timed out.");
+    }
+
+    public async Task<List<Game>> GetMergedCollectionsAsync(
+        IEnumerable<string> usernames,
+        CancellationToken ct = default)
+    {
+        Dictionary<int, HashSet<string>> gameOwners = new();
+        foreach (string username in usernames)
+        {
+            List<CollectionItem> collectionItems = await GetUserCollectionAsync(username);
+
+            foreach (CollectionItem collectionItem in collectionItems)
+            {
+                if (!gameOwners.TryGetValue(collectionItem.GameId, out var owners))
+                {
+                    owners = new HashSet<string>();
+                    gameOwners[collectionItem.GameId] = owners;
+                }
+
+                owners.Add(username);
+            }
+        }
+
+        List<Game> games = await GetGameDetails(gameOwners.Keys.ToList(), ct);
+
+        foreach (Game game in games)
+        {
+            if (gameOwners.TryGetValue(game.GameId, out var owners))
+            {
+                game.Owners = owners;
+            }
+        }
+
+        return games;
     }
 }
