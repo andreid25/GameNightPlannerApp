@@ -14,6 +14,7 @@
             rows="4"
             placeholder="Enter one username per line">
     </textarea>
+    <input type="number" @bind="Playtime" />
 
     <button @onclick="LoadCollection" disabled="@isLoading">
         @(isLoading ? "Loading..." : "Load Collection")
@@ -27,8 +28,6 @@
 
 @if (collection.Any())
 {
-    <h3>@username's Collection</h3>
-
     <ul>
         @foreach (Game game in collection)
         {
@@ -46,12 +45,13 @@
 }
 
 @code {
-    private string username = "";
     private bool isLoading;
     private string error = "";
     private string UsernamesRaw = "";
+    private int Playtime;
 
     private List<Game> collection = new();
+    Filter filter = new();
 
     private async Task LoadCollection()
     {
@@ -76,7 +76,9 @@
         catch (Exception ex)
         {
             error = ex.Message;
+            return;
         }
+        collection = filter.FilterByTime(collection, Playtime*60);
 
         isLoading = false;
     }
